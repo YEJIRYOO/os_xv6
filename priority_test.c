@@ -1,26 +1,52 @@
 #include "types.h"
 #include "user.h"
 
-int main(int argc, char *argv[]){
-    int pid=getpid();
-    int priority=get_proc_priority(pid);
+// user.h에 다음 프로토타입이 있어야 합니다.
+// int set_proc_priority(int pid, int prio);
+// int get_proc_priority(int pid);
 
-    printf(1,"pid: %d , Initial priority: %d\n",pid,priority);
+int
+main(int argc, char *argv[])
+{
+  int parent_prio = 10;
+  int child_prio  = 1;
 
-    priority=atoi(argv[1]);
+  if (argc >= 2) parent_prio = atoi(argv[1]);
+  if (argc >= 3) child_prio  = atoi(argv[2]);
 
-    printf(1,"pid: %d , priority: %d\n",pid,get_proc_priority(pid));
+  // 부모: 초기 상태
+  int mypid = getpid();
+  printf(1, "pid: %d , Initial priority: %d\n", mypid, get_proc_priority(mypid));
 
-    pid=fork();
+  // 부모: 우선순위 적용
+  set_proc_priority(mypid, parent_prio);
+  printf(1, "pid: %d , priority: %d\n", mypid, get_proc_priority(mypid));
 
-    int p_pid=getpid();
-    int p_priority=get_proc_priority(p_pid);
+  // fork
+  int rc = fork();
+  if (rc < 0) {
+    printf(1, "fork failed\n");
+    exit();
+  }
 
-    int c_pid=getpid();
-    int c_priority=get_proc_priority(c_pid);
+  if (rc == 0) {
+    // ===== 자식 프로세스 =====
+    int cpid = getpid();
+    set_proc_priority(cpid, child_prio);  // 자식 우선순위 적용
+    printf(1, "child pid: %d, child priority: %d\n", cpid, get_proc_priority(cpid));
 
-    printf(1,"parent pid: %d, parent priority: %d\n",p_pid,p_priority);
-    printf(1,"child pid: %d, child priority: %d\n",c_pid,c_priority);
+    // CPU를 좀 쓰게 루프 (스케줄링 관찰용)
+    for (;;) ;
+    // exit();  // 도달하지 않음
+  } else {
+    // ===== 부모 프로세스 =====
+    int ppid = getpid();
+    printf(1, "parent pid: %d, parent priority: %d\n", ppid, get_proc_priority(ppid));
 
-   exit();
+    // 잠시 대기 후 정리
+    sleep(50);
+    kill(rc);
+    wait();
+    exit();
+  }
 }
