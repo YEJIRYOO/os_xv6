@@ -19,8 +19,8 @@ int main(int argc, char *argv[]){
     int c_pid=getpid();
     int c_priority=get_proc_priority(c_pid);
 
-    prtinf(1,"parent pid: %d, parent priority: %d\n",p_pid,p_priority);
-    prtinf(1,"child pid: %d, child priority: %d\n",c_pid,c_priority);
+    printf(1,"parent pid: %d, parent priority: %d\n",p_pid,p_priority);
+    printf(1,"child pid: %d, child priority: %d\n",c_pid,c_priority);
 
    return 0;
 }
