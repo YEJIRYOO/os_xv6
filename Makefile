@@ -182,6 +182,7 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_priority_test\
+	_priority_scheduler_test\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
