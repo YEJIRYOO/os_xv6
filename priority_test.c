@@ -22,5 +22,5 @@ int main(int argc, char *argv[]){
     printf(1,"parent pid: %d, parent priority: %d\n",p_pid,p_priority);
     printf(1,"child pid: %d, child priority: %d\n",c_pid,c_priority);
 
-   return 0;
+   exit();
 }
