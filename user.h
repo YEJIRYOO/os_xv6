@@ -37,3 +37,7 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+
+// OS_assign_3
+int set_proc_priority(int,int);
+int get_proc_priority(int);

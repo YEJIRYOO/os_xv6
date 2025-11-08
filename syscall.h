@@ -20,3 +20,7 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+
+// OS_assignment_3
+#define SYS_set_proc_priority 22
+#define SYS_get_proc_priority 23

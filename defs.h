@@ -186,5 +186,13 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
+
+// OS_assign_3
+int             set_proc_priority(int, int);
+int             get_proc_priority(int);
+int             sys_set_proc_priority(void);
+int             sys_get_proc_priority(void);
+
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

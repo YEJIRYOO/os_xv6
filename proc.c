@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include <limits.h>
 
 struct {
   struct spinlock lock;
@@ -88,6 +89,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->priority=5; // Priority default 5
+  p->proc_run_cnt=0;
 
   release(&ptable.lock);
 
@@ -198,7 +201,8 @@ fork(void)
   }
   np->sz = curproc->sz;
   np->parent = curproc;
-  *np->tf = *curproc->tf;
+  *np->tf = *curproc->tf; 
+  np->priority=curproc->priority; // Initialize child process priority
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -332,24 +336,59 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+    // 0. Find target by minimum run count in RUNNABLE set
+    int found=0;
+    int min_run=INT_MAX;
+
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
+      found=1;
+      if(p->proc_run_cnt<min_run) min_run=p->proc_run_cnt;
+    }
+
+    if(found){
+      for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
+        if(p->state!=RUNNABLE) continue;
+        if(p->proc_run_cnt==min_run&&p&&p->priority<10) p->priority++;
+      }
+
+      struct proc *best=0;
+      for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
+        if(p-> state!=RUNNABLE) continue;
+        if(best==0||p->priority>best->priority||p->priority==best->priority&&p->proc_run_cnt<best->proc_run_cnt){
+          best=p;
+        }
+      }      
+
+      if(best){
+        c->proc=best;
+        switchuvm(best);
+        best->state=RUNNING;
+        best->proc_run_cnt++;
+
+        swtch(&(c->scheduler),best->context);
+        switchkvm();
+
+        c->proc=0;
+      }
+    }
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+    //   c->proc = p;
+    //   switchuvm(p);
+    //   p->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+    //   swtch(&(c->scheduler), p->context);
+    //   switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
+    //   // Process is done running for now.
+    //   // It should have changed its p->state before coming back.
+    //   c->proc = 0;
+    // }
     release(&ptable.lock);
 
   }
@@ -531,4 +570,49 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+set_proc_priority(int pid, int priority){
+  struct proc *p;
+
+  acquire(&ptable.lock);
+
+  // Wrong input
+  if(priority>10||priority<1) return -1;
+
+  // Find p with matching pid
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid==pid) {
+      p->priority=priority;
+      release(&ptable.lock);
+
+      return priority;
+    }
+    else continue;
+  }
+
+  release(&ptable.lock);
+  
+  return -1;
+}
+
+int
+get_proc_priority(int pid){
+  struct proc *p;
+  
+  acquire(&ptable.lock);
+
+  // Find p with matching pid
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid==pid) {
+      release(&ptable.lock);
+      return p->priority;
+    }
+    else continue;
+  }
+
+  release(&ptable.lock);
+
+  return -1;
 }
