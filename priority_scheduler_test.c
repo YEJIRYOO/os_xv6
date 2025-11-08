@@ -3,31 +3,27 @@
 #include "stat.h"
 #include "user.h"
 
-// 커널에 이미 만들어 둔 시스템콜 프로토타입
+// 커널에 구현해둔 시스템콜 프로토타입 (user.h에도 선언돼 있어야 함)
 int set_proc_priority(int pid, int prio);
 int get_proc_priority(int pid);
 
-// (선택) 실행 횟수 조회 시스템콜이 있다면 주석 해제하세요.
-// int get_proc_runcnt(int pid);
-
-static void cpu_burn(const char *tag) {
-  // 너무 많이 찍히지 않게 큰 주기로만 한 글자 출력
+// CPU를 꾸준히 소모하는 루프 (출력 없음: 콘솔 인터리빙 줄이기)
+static void cpu_burn(void) {
   volatile unsigned long long x = 0;
-  while(1){
-    x++;
-    if((x & ((1ULL<<24)-1)) == 0){ // 대략 주기적으로 한 글자
-      printf(1, "%s", tag);
-    }
-  }
+  for(;;) x++;
+}
+
+// 간단한 2자리 패딩(폭 지정 미지원이라 수동 정렬용)
+static void print2(int n){
+  if(n < 10) printf(1, " %d", n);
+  else       printf(1, "%d", n);
 }
 
 int
 main(int argc, char **argv)
 {
-  // 현재 구현: 숫자가 클수록 높은 우선순위
+  // 현재 스케줄러는 "숫자가 클수록 높은 우선순위"
   int pr_hi = 9, pr_md = 5, pr_lo = 1;
-
-  // 필요하면 인자로 덮어쓰기: priority_scheduler_test [hi] [md] [lo]
   if(argc >= 2) pr_hi = atoi(argv[1]);
   if(argc >= 3) pr_md = atoi(argv[2]);
   if(argc >= 4) pr_lo = atoi(argv[3]);
@@ -38,7 +34,7 @@ main(int argc, char **argv)
     int me = getpid();
     set_proc_priority(me, pr_hi);
     printf(1, "child-Hi pid=%d prio=%d\n", me, get_proc_priority(me));
-    cpu_burn("[H]");
+    cpu_burn(); // never returns
     exit();
   }
 
@@ -48,7 +44,7 @@ main(int argc, char **argv)
     int me = getpid();
     set_proc_priority(me, pr_md);
     printf(1, "child-Md pid=%d prio=%d\n", me, get_proc_priority(me));
-    cpu_burn("[M]");
+    cpu_burn();
     exit();
   }
 
@@ -58,32 +54,31 @@ main(int argc, char **argv)
     int me = getpid();
     set_proc_priority(me, pr_lo);
     printf(1, "child-Lo pid=%d prio=%d\n", me, get_proc_priority(me));
-    cpu_burn("[L]");
+    cpu_burn();
     exit();
   }
 
-  // 부모: 주기적으로 우선순위(그리고 원하면 실행횟수) 관찰
-  printf(1, "\nTick\tHi(prio)\tMd(prio)\tLo(prio)\n");
-  for(int t=0; t<=150; t++){
+  // 부모: 주기적으로 각 자식의 현재 priority를 관찰
+  printf(1, "\nTick\tHi(pr)\tMd(pr)\tLo(pr)\n");
+  for(int t=0; t<=120; t++){
     if(t % 10 == 0){
       int p1 = get_proc_priority(c1);
       int p2 = get_proc_priority(c2);
       int p3 = get_proc_priority(c3);
 
-      // (선택) 실행 횟수도 찍고 싶으면 아래 주석을 해제
-      // int r1 = get_proc_runcnt(c1);
-      // int r2 = get_proc_runcnt(c2);
-      // int r3 = get_proc_runcnt(c3);
-      // printf(1, "%3d\t%2d(%d)\t\t%2d(%d)\t\t%2d(%d)\n", t, p1, r1, p2, r2, p3, r3);
-
-      printf(1, "%3d\t%2d\t\t%2d\t\t%2d\n", t, p1, p2, p3);
+      // 정렬: Tick은 그냥 %d, 나머지는 2자리 패딩
+      printf(1, "%d\t", t);
+      print2(p1); printf(1, "\t");
+      print2(p2); printf(1, "\t");
+      print2(p3); printf(1, "\n");
     }
-    sleep(1);
+    sleep(1); // 한 틱
   }
 
-  // 정리
+  // 종료 정리
   kill(c1); kill(c2); kill(c3);
   wait(); wait(); wait();
+
   printf(1, "\n[priority_scheduler_test] done\n");
   exit();
 }
