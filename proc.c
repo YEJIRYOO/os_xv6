@@ -151,6 +151,8 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
+  p->priority=5;
+  p->proc_run_cnt=0;
   p->state = RUNNABLE;
 
   release(&ptable.lock);
