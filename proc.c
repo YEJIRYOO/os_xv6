@@ -357,7 +357,7 @@ scheduler(void)
       struct proc *best=0;
       for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
         if(p-> state!=RUNNABLE) continue;
-        if(best==0||p->priority>best->priority||p->priority==best->priority&&p->proc_run_cnt<best->proc_run_cnt){
+        if(best==0||p->priority>best->priority||(p->priority==best->priority&&p->proc_run_cnt<best->proc_run_cnt)){
           best=p;
         }
       }      
