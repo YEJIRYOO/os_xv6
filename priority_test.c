@@ -1,28 +1,26 @@
 #include "types.h"
 #include "user.h"
 
-int
-main(int argc, char *argv[])
-{
-  int mypid = getpid();
-  printf(1, "pid: %d , Initial priority: %d\n", mypid, get_proc_priority(mypid));
+int main(int argc, char *argv[]){
+    int pid=getpid();
+    int priority=get_proc_priority(pid);
 
-  int rc = fork();
-  if(rc < 0){
-    printf(1, "fork failed\n");
-    exit();
-  }
+    printf(1,"pid: %d , Initial priority: %d\n",pid,priority);
 
-  if(rc == 0){
-    // child
-    int cpid = getpid();
-    printf(1, "child pid: %d, child priority: %d\n", cpid, get_proc_priority(cpid));
-    exit();
-  }else{
-    // parent
-    int ppid = getpid();
-    printf(1, "parent pid: %d, parent priority: %d\n", ppid, get_proc_priority(ppid));
-    wait();
-    exit();
-  }
+    priority=atoi(argv[1]);
+
+    printf(1,"pid: %d , priority: %d\n",pid,get_proc_priority(pid));
+
+    pid=fork();
+
+    int p_pid=getpid();
+    int p_priority=get_proc_priority(p_pid);
+
+    int c_pid=getpid();
+    int c_priority=get_proc_priority(c_pid);
+
+    printf(1,"parent pid: %d, parent priority: %d\n",p_pid,p_priority);
+    printf(1,"child pid: %d, child priority: %d\n",c_pid,c_priority);
+
+   exit();
 }
