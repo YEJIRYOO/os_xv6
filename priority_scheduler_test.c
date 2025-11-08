@@ -3,82 +3,72 @@
 #include "stat.h"
 #include "user.h"
 
-// 커널에 구현해둔 시스템콜 프로토타입 (user.h에도 선언돼 있어야 함)
+// user.h에 선언이 있어야 합니다.
 int set_proc_priority(int pid, int prio);
 int get_proc_priority(int pid);
 
-// CPU를 꾸준히 소모하는 루프 (출력 없음: 콘솔 인터리빙 줄이기)
-static void cpu_burn(void) {
-  volatile unsigned long long x = 0;
+static void burn_forever(void){
+  volatile int x = 0;
   for(;;) x++;
-}
-
-// 간단한 2자리 패딩(폭 지정 미지원이라 수동 정렬용)
-static void print2(int n){
-  if(n < 10) printf(1, " %d", n);
-  else       printf(1, "%d", n);
 }
 
 int
 main(int argc, char **argv)
 {
-  // 현재 스케줄러는 "숫자가 클수록 높은 우선순위"
-  int pr_hi = 9, pr_md = 5, pr_lo = 1;
-  if(argc >= 2) pr_hi = atoi(argv[1]);
-  if(argc >= 3) pr_md = atoi(argv[2]);
-  if(argc >= 4) pr_lo = atoi(argv[3]);
+  // 인자: [children(포함해서 총 N개, 기본 12)] [stopped_prio(기본 8)] [infinite_prio(기본 10)]
+  int N = 12;
+  int pr_stopped = 8;
+  int pr_infinite = 10;
 
-  // 자식 1 (High)
-  int c1 = fork();
-  if(c1 == 0){
-    int me = getpid();
-    set_proc_priority(me, pr_hi);
-    printf(1, "child-Hi pid=%d prio=%d\n", me, get_proc_priority(me));
-    cpu_burn(); // never returns
-    exit();
-  }
+  if(argc >= 2) N = atoi(argv[1]);
+  if(argc >= 3) pr_stopped = atoi(argv[2]);
+  if(argc >= 4) pr_infinite = atoi(argv[3]);
 
-  // 자식 2 (Mid)
-  int c2 = fork();
-  if(c2 == 0){
-    int me = getpid();
-    set_proc_priority(me, pr_md);
-    printf(1, "child-Md pid=%d prio=%d\n", me, get_proc_priority(me));
-    cpu_burn();
-    exit();
-  }
+  if(N < 2) N = 2;            // 최소 2개: 무한 1개 + 즉시 종료 1개 이상
 
-  // 자식 3 (Low)
-  int c3 = fork();
-  if(c3 == 0){
-    int me = getpid();
-    set_proc_priority(me, pr_lo);
-    printf(1, "child-Lo pid=%d prio=%d\n", me, get_proc_priority(me));
-    cpu_burn();
-    exit();
-  }
+  int i;
+  int inf_pid = -1;
 
-  // 부모: 주기적으로 각 자식의 현재 priority를 관찰
-  printf(1, "\nTick\tHi(pr)\tMd(pr)\tLo(pr)\n");
-  for(int t=0; t<=120; t++){
-    if(t % 10 == 0){
-      int p1 = get_proc_priority(c1);
-      int p2 = get_proc_priority(c2);
-      int p3 = get_proc_priority(c3);
-
-      // 정렬: Tick은 그냥 %d, 나머지는 2자리 패딩
-      printf(1, "%d\t", t);
-      print2(p1); printf(1, "\t");
-      print2(p2); printf(1, "\t");
-      print2(p3); printf(1, "\n");
+  for(i = 0; i < N; i++){
+    int rc = fork();
+    if(rc < 0){
+      printf(1, "fork failed\n");
+      exit();
     }
-    sleep(1); // 한 틱
+    if(rc == 0){
+      // --- child ---
+      int me = getpid();
+      if(i == 0){
+        // 무한 루프 자식 (가장 높은 우선순위)
+        set_proc_priority(me, pr_infinite);
+        printf(1, "PID(%d) : priority (%d) infinite ===\n", me, get_proc_priority(me));
+        burn_forever();      // 종료 안 함
+        // exit();           // 도달하지 않음
+      }else{
+        // 즉시 종료하는 자식들
+        set_proc_priority(me, pr_stopped);
+        printf(1, "PID(%d) : priority (%d) stopped\n", me, get_proc_priority(me));
+        exit();
+      }
+    }else{
+      // --- parent ---
+      if(i == 0) inf_pid = rc;   // 무한 루프 자식 pid 기억
+    }
   }
 
-  // 종료 정리
-  kill(c1); kill(c2); kill(c3);
-  wait(); wait(); wait();
+  // 부모: 종료한 자식들 수집/출력 (무한 루프 자식 1개 빼고 N-1개)
+  for(i = 0; i < N - 1; i++){
+    int done = wait();
+    if(done > 0){
+      printf(1, "Parent: Child PID(%d) has finished.\n", done);
+    }
+  }
 
-  printf(1, "\n[priority_scheduler_test] done\n");
+  // 무한 루프 자식 종료 처리
+  if(inf_pid > 0){
+    kill(inf_pid);
+    wait();
+  }
+
   exit();
 }
