@@ -338,38 +338,49 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
 
-    // 0. Find target by minimum run count in RUNNABLE set
-    int found=0;
-    int min_run=INT_MAX;
+    // 1. Find minimum run count in RUNNABLE set
+    int is_runnable_found=0;
+    int min_run_cnt=INT_MAX;
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-      found=1;
-      if(p->proc_run_cnt<min_run) min_run=p->proc_run_cnt;
+
+      if(p->state==RUNNABLE){
+        is_runnable_found=1;
+        if(p->proc_run_cnt<min_run_cnt) min_run_cnt=p->proc_run_cnt;
+      }
+      else continue;
+
     }
 
-    if(found){
+    // 2. Increase the priority of the least executed process
+    if(is_runnable_found){
       for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
-        if(p->state!=RUNNABLE) continue;
-        if(p->proc_run_cnt==min_run&&p&&p->priority<10) p->priority++;
+        if(p->state==RUNNABLE){
+          if(p->proc_run_cnt==min_run_cnt&&p->priority<10) p->priority++;
+        }
+        else continue;
+        
       }
 
-      struct proc *best=0;
+      // 3. Find process with highest priority and switch context with it
+      //    When priority is equal, run a process with fewer run count
+      struct proc *run_first=0;
       for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
-        if(p-> state!=RUNNABLE) continue;
-        if(best==0||p->priority>best->priority||(p->priority==best->priority&&p->proc_run_cnt<best->proc_run_cnt)){
-          best=p;
+        if(p->state==RUNNABLE){
+          if(run_first==0||p->priority>run_first->priority||(p->priority==run_first->priority&&p->proc_run_cnt<run_first->proc_run_cnt)) run_first=p;
         }
-      }      
+        else continue;
+      }
 
-      if(best){
-        c->proc=best;
-        switchuvm(best);
-        best->state=RUNNING;
-        best->proc_run_cnt++;
+      if(run_first){
+        c->proc=run_first;
+        switchuvm(run_first);
+        run_first->state=RUNNING;
 
-        swtch(&(c->scheduler),best->context);
+        // Increase process run count
+        run_first->proc_run_cnt++;
+
+        swtch(&(c->scheduler),run_first->context);
         switchkvm();
 
         c->proc=0;
